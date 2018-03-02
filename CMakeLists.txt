@@ -159,10 +159,10 @@ set(SRCS
 
 find_package(libjpeg-turbo REQUIRED CONFIG)
 find_package(zlib REQUIRED CONFIG)
-
+find_package(adobe-xmp REQUIRED CONFIG)
 add_library(${PROJECT_NAME} ${PUBLIC_HDRS} ${SRCS})
 add_library(::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-target_link_libraries(${PROJECT_NAME} PUBLIC ::zlibstatic jpeg::jpeg-static)
+target_link_libraries(${PROJECT_NAME} PUBLIC ::zlibstatic jpeg::jpeg-static ::XMPCoreStatic ::XMPFilesStatic)
 if (BUILD_SHARED_LIBS)
     set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(${PROJECT_NAME} PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
