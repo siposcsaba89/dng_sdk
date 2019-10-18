@@ -5,6 +5,7 @@ project(dng_sdk)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
+set(BUILD_SHARED_LIBS 0)
 
 set(PUBLIC_HDRS
     source/dng_1d_function.h
@@ -157,13 +158,14 @@ set(SRCS
     source/dng_xy_coord.cpp   
 )
 
-find_package(libjpeg-turbo REQUIRED CONFIG)
-find_package(zlib REQUIRED CONFIG)
+find_package(JPEG REQUIRED)
+find_package(ZLIB REQUIRED)
 find_package(adobe-xmp REQUIRED CONFIG)
 add_library(${PROJECT_NAME} ${PUBLIC_HDRS} ${SRCS})
 add_library(::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-target_link_libraries(${PROJECT_NAME} PUBLIC ::zlibstatic jpeg::jpeg-static ::XMPCoreStatic ::XMPFilesStatic)
+target_link_libraries(${PROJECT_NAME} PUBLIC ZLIB::ZLIB JPEG::JPEG ::XMPCoreStatic ::XMPFilesStatic)
 if (BUILD_SHARED_LIBS)
+	message(FATAL_ERROR "Shared libs not implemented, missing exports!")
     set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(${PROJECT_NAME} PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
 endif()
