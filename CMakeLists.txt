@@ -1,9 +1,6 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.25)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(dng_sdk)
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 
 set(PUBLIC_HDRS
@@ -15,12 +12,14 @@ set(PUBLIC_HDRS
     source/dng_auto_ptr.h
     source/dng_bad_pixels.h
     source/dng_big_table.h
+    source/dng_bmff.h
     source/dng_bottlenecks.h
     source/dng_camera_profile.h
     source/dng_classes.h
     source/dng_color_space.h
     source/dng_color_spec.h
     source/dng_date_time.h
+    source/dng_deprecated_flags.h
     source/dng_errors.h
     source/dng_exceptions.h
     source/dng_exif.h
@@ -39,6 +38,9 @@ set(PUBLIC_HDRS
     source/dng_info.h
     source/dng_iptc.h
     source/dng_jpeg_image.h
+    source/dng_jpeg_memory_source.h
+    source/dng_jpeglib.h
+    source/dng_jxl.h
     source/dng_lens_correction.h
     source/dng_linearization_info.h
     source/dng_local_string.h
@@ -67,7 +69,9 @@ set(PUBLIC_HDRS
     source/dng_resample.h
     source/dng_safe_arithmetic.h
     source/dng_sdk_limits.h
+    source/dng_semantic_mask.h
     source/dng_shared.h
+    source/dng_simd_type.h
     source/dng_simple_image.h
     source/dng_spline.h
     source/dng_stream.h
@@ -81,6 +85,7 @@ set(PUBLIC_HDRS
     source/dng_tone_curve.h
     source/dng_types.h
     source/dng_uncopyable.h
+    source/dng_update_meta.h
     source/dng_utils.h
     source/dng_xmp.h
     source/dng_xmp_sdk.h
@@ -94,6 +99,7 @@ set(SRCS
     source/dng_area_task.cpp
     source/dng_bad_pixels.cpp
     source/dng_big_table.cpp
+    source/dng_bmff.cpp
     source/dng_bottlenecks.cpp
     source/dng_camera_profile.cpp
     source/dng_color_space.cpp
@@ -114,10 +120,13 @@ set(SRCS
     source/dng_info.cpp
     source/dng_iptc.cpp
     source/dng_jpeg_image.cpp
+    source/dng_jpeg_memory_source.cpp
+    source/dng_jxl.cpp
     source/dng_lens_correction.cpp
     source/dng_linearization_info.cpp
     source/dng_local_string.cpp
     source/dng_lossless_jpeg.cpp
+    source/dng_lossless_jpeg_shared.cpp
     source/dng_matrix.cpp
     source/dng_memory.cpp
     source/dng_memory_stream.cpp
@@ -151,40 +160,53 @@ set(SRCS
     source/dng_temperature.cpp
     source/dng_tile_iterator.cpp
     source/dng_tone_curve.cpp
+    source/dng_update_meta.cpp
     source/dng_utils.cpp
+    source/dng_validate.cpp
     source/dng_xmp.cpp
     source/dng_xmp_sdk.cpp
-    source/dng_xy_coord.cpp   
+    source/dng_xy_coord.cpp  
 )
 
-find_package(libjpeg-turbo REQUIRED CONFIG)
-find_package(zlib REQUIRED CONFIG)
+
+find_package(JPEG REQUIRED)
+find_package(ZLIB REQUIRED)
 find_package(adobe-xmp REQUIRED CONFIG)
+include(cmake/jxl-import.cmake)
+
 add_library(${PROJECT_NAME} ${PUBLIC_HDRS} ${SRCS})
 add_library(::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-target_link_libraries(${PROJECT_NAME} PUBLIC ::zlibstatic jpeg::jpeg-static ::XMPCoreStatic ::XMPFilesStatic)
+target_link_libraries(${PROJECT_NAME} PUBLIC ZLIB::ZLIB ${JPEG_LIBRARIES} ::XMPCoreStatic ::XMPFilesStatic jxl::jxl)
+target_include_directories(${PROJECT_NAME} PRIVATE ${JPEG_INCLUDE_DIR})
 if (BUILD_SHARED_LIBS)
-    set_target_properties(${PROJECT_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
-    set_target_properties(${PROJECT_NAME} PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN 1
+    )
 endif()
-set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX _d)
-set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER libs)
-#target_compile_definitions(${PROJECT_NAME} PRIVATE -DNO_JASPER=1 -DNO_JPEG=1 -DNO_LCMS=1)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    DEBUG_POSTFIX _d
+    RELWITHDEBINFO_POSTFIX _rd
+    FOLDER libs
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+target_compile_definitions(${PROJECT_NAME} PUBLIC -DqDNGSupportJXL=1 -DqDNGUseLibJPEG=1 -DqDNGXMPDocOps=0)
 if (MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE "/MP")
-    target_compile_definitions(${PROJECT_NAME} PUBLIC -DqWinOS=1 -DqWinUniversal=1 -DqDNGXMPDocOps=0 -DqDNGUseLibJPEG=1)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC -DqWinOS=1 -DqWinUniversal=1)
 elseif(UNIX)
     if(APPLE)
-        target_compile_definitions(${PROJECT_NAME} PUBLIC -qMacOS=1 -DqDNGXMPDocOps=0 -DqDNGUseLibJPEG=1)
+        target_compile_definitions(${PROJECT_NAME} PUBLIC -qMacOS=1)
     elseif(ANDROID)
-        target_compile_definitions(${PROJECT_NAME} PUBLIC -qAndroid=1 -DqDNGXMPDocOps=0 -DqDNGUseLibJPEG=1)
+        target_compile_definitions(${PROJECT_NAME} PUBLIC -qAndroid=1)
     else()
-        target_compile_definitions(${PROJECT_NAME} PUBLIC -DqLinux=1 -DqDNGXMPDocOps=0 -DqDNGUseLibJPEG=1 -DUNIX_ENV=1)
-	target_link_libraries(${PROJECT_NAME} PUBLIC dl)
+        target_compile_definitions(${PROJECT_NAME} PUBLIC -DqLinux=1 -DUNIX_ENV=1)
+	    target_link_libraries(${PROJECT_NAME} PUBLIC dl)
     endif()
 endif()
 
-source_group(${PROJECT_NAME} FILES ${PUBLIC_HDRS})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRCS})
 
 include(GenerateExportHeader)
 generate_export_header(${PROJECT_NAME} EXPORT_FILE_NAME ${CMAKE_BINARY_DIR}/gen/${PROJECT_NAME}/${PROJECT_NAME}_export.h)
@@ -197,8 +219,6 @@ target_include_directories(${PROJECT_NAME}
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/gen/${PROJECT_NAME}>
         $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
-
-
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
@@ -213,6 +233,7 @@ install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}-targets DESTINATION
 install(FILES 
         ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake 
         ${CMAKE_CURRENT_BINARY_DIR}/gen/${PROJECT_NAME}-config-version.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/jxl-import.cmake
     DESTINATION 
         lib/cmake/${PROJECT_NAME})
     

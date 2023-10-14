@@ -1,15 +1,10 @@
 /*****************************************************************************/
-// Copyright 2006-2007 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
 /*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_render.h#2 $ */ 
-/* $DateTime: 2015/06/09 23:32:35 $ */
-/* $Change: 1026104 $ */
-/* $Author: aksherry $ */
 
 /** \file
  * Classes for conversion of RAW data to final image.
@@ -24,10 +19,34 @@
 
 #include "dng_1d_function.h"
 #include "dng_auto_ptr.h"
+#include "dng_big_table.h"
+#include "dng_camera_profile.h"
 #include "dng_classes.h"
+#include "dng_matrix.h"
 #include "dng_spline.h"
 #include "dng_uncopyable.h"
 #include "dng_xy_coord.h"
+
+/******************************************************************************/
+
+/// \brief Curve for removing zero offset from stage3 image.
+
+class dng_function_zero_offset: public dng_1d_function
+	{
+	
+	public:
+	
+		real64 fZeroOffset;
+		
+		real64 fScale;
+		
+	public:
+		
+		dng_function_zero_offset (real64 zeroOffset);
+		
+		virtual real64 Evaluate (real64 x) const;
+
+	};
 
 /******************************************************************************/
 
@@ -46,12 +65,15 @@ class dng_function_exposure_ramp: public dng_1d_function
 		real64 fRadius;		// Rounding radius.
 		
 		real64 fQScale;		// Quadradic scale.
+
+		const bool fSupportOverrange = false;
 		
 	public:
 		
 		dng_function_exposure_ramp (real64 white,
-				   					real64 black,
-				   					real64 minBlack);
+									real64 black,
+									real64 minBlack,
+									bool supportOverrange);
 			
 		virtual real64 Evaluate (real64 x) const;
 
@@ -151,6 +173,10 @@ class dng_render: private dng_uncopyable
 		uint32 fFinalPixelType;
 		
 		uint32 fMaximumSize;
+
+		// Which camera profile to use?
+
+		dng_camera_profile_id fProfileID;
 		
 	private:
 	
@@ -245,10 +271,7 @@ class dng_render: private dng_uncopyable
 		/// Get final color space in which resulting image data should be represented.
 		/// \retval Color space to use.
 
-		const dng_color_space & FinalSpace () const
-			{
-			return *fFinalSpace;
-			}
+		const dng_color_space & FinalSpace (const dng_camera_profile *profile) const;
 			
 		/// Set pixel type of final image data.
 		/// Can be ttByte (default), ttShort, or ttFloat.
@@ -290,6 +313,20 @@ class dng_render: private dng_uncopyable
 			return fMaximumSize;
 			}
 
+		/// Set the id of the preferred camera profile for rendering the image.
+
+		void SetCameraProfileID (const dng_camera_profile_id &id)
+			{
+			fProfileID = id;
+			}
+
+		/// Get the id of the preferred camera profile for rendering the image.
+
+		const dng_camera_profile_id & CameraProfileID  () const
+			{
+			return fProfileID;
+			}
+
 		/// Actually render a digital negative to a displayable image.
 		/// Input digital negative is passed to the constructor of this dng_render class.
 		/// \retval The final resulting image.
@@ -300,6 +337,6 @@ class dng_render: private dng_uncopyable
 
 /*****************************************************************************/
 
-#endif
+#endif	// __dng_render__
 	
 /*****************************************************************************/

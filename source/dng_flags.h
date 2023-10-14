@@ -1,15 +1,10 @@
 /*****************************************************************************/
-// Copyright 2006-2014 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
 /*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_flags.h#11 $ */ 
-/* $DateTime: 2016/03/10 16:02:14 $ */
-/* $Change: 1066844 $ */
-/* $Author: erichan $ */
 
 /** \file
  * Conditional compilation flags for DNG SDK.
@@ -32,13 +27,13 @@
 
 // Make sure a platform is defined
 
-#if !(defined(qMacOS) || defined(qWinOS) || defined(qAndroid) || defined(qiPhone) || defined(qLinux))
+#if !(defined(qMacOS) || defined(qWinOS) || defined(qAndroid) || defined(qiPhone) || defined(qLinux) || defined(qWeb))
 #include "RawEnvironment.h"
 #endif
 
 // This requires a force include or compiler define.  These are the unique platforms.
 
-#if !(defined(qMacOS) || defined(qWinOS) || defined(qAndroid) || defined(qiPhone) || defined(qLinux))
+#if !(defined(qMacOS) || defined(qWinOS) || defined(qAndroid) || defined(qiPhone) || defined(qLinux) || defined(qWeb))
 #error Unable to figure out platform
 #endif
 
@@ -81,6 +76,26 @@
 
 /*****************************************************************************/
 
+#ifndef qIsFauxPlatformBuild
+#define qIsFauxPlatformBuild 0
+#endif
+
+#ifndef qIsFauxWebPlatformBuild
+#define qIsFauxWebPlatformBuild 0
+#endif
+
+#ifndef qIsFauxLinuxPlatformBuild
+#define qIsFauxLinuxPlatformBuild 0
+#endif
+
+/*****************************************************************************/
+
+#ifndef qMacOSNonFaux
+#define qMacOSNonFaux (qMacOS && !qIsFauxPlatformBuild)
+#endif
+
+/*****************************************************************************/
+
 #if qiPhoneSimulator
 #if !qiPhone
 #error "qiPhoneSimulator set and not qiPhone"
@@ -95,24 +110,36 @@
 
 /*****************************************************************************/
 
-// arm and neon support
+// arm and arm64 support
 
 // arm detect (apple vs. win)
-#if defined(__arm__) || defined(__arm64__) || defined(_M_ARM)
+#if defined(__arm__) || defined(__arm64__) || defined(_M_ARM) || defined(_M_ARM64) || defined(__aarch64__)
 #define qARM 1
 #endif
 
-// arm_neon detect
-#if defined(__ARM_NEON__) || defined(_M_ARM)
-#define qARMNeon 1
+#if defined(__arm64__) || defined(_M_ARM64) || defined(__aarch64__)
+#define qARM64 1
 #endif
 
 #ifndef qARM 
 #define qARM 0
 #endif
 
-#ifndef qARMNeon
-#define qARMNeon 0
+#ifndef qARM64 
+#define qARM64 0
+#endif
+
+/*****************************************************************************/
+
+/// \def qX86_64
+/// 1 if and only if this target platform is 64-bit x86 architecture
+
+#if defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)
+#define qX86_64 1
+#endif
+
+#ifndef qX86_64
+#define qX86_64 0
 #endif
 
 /*****************************************************************************/
@@ -151,6 +178,22 @@
 
 /*****************************************************************************/
 
+// This is not really a switch, but rather a shorthand for determining whether
+// or not we're building a particular translation unit (source file) using the
+// Intel Compiler.
+
+#ifndef qDNGIntelCompiler
+#if defined(__INTEL_COMPILER)
+#define qDNGIntelCompiler (__INTEL_COMPILER >= 1700)
+#elif defined(__INTEL_LLVM_COMPILER)
+#define qDNGIntelCompiler __INTEL_LLVM_COMPILER
+#else
+#define qDNGIntelCompiler 0
+#endif
+#endif
+
+/*****************************************************************************/
+
 // Figure out byte order.
 
 /// \def qDNGBigEndian 
@@ -182,7 +225,11 @@
 #elif defined(__BIG_ENDIAN__)
 #define qDNGBigEndian 1
 
-#elif defined(_ARM_)
+#elif defined(_ARM_) || defined(__ARM_NEON) || defined(__mips__)
+#define qDNGBigEndian 0
+
+#elif defined(_M_ARM64)
+// See https://docs.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=vs-2019
 #define qDNGBigEndian 0
 
 #else
@@ -212,7 +259,7 @@
 #if qMacOS
 
 #ifdef __LP64__
-#if    __LP64__
+#if	   __LP64__
 #define qDNG64Bit 1
 #endif
 #endif
@@ -220,7 +267,7 @@
 #elif qWinOS
 
 #ifdef WIN64
-#if    WIN64
+#if	   WIN64
 #define qDNG64Bit 1
 #endif
 #endif
@@ -228,7 +275,15 @@
 #elif qLinux
 
 #ifdef __LP64__
-#if    __LP64__
+#if	   __LP64__
+#define qDNG64Bit 1
+#endif
+#endif
+
+#elif qAndroid
+
+#ifdef __LP64__
+#if	   __LP64__
 #define qDNG64Bit 1
 #endif
 #endif
@@ -236,10 +291,36 @@
 #endif
 
 #ifndef qDNG64Bit
+#ifdef qXCodeRez
+#define qDNG64Bit qXCodeRez
+#else
 #define qDNG64Bit 0
+#endif
 #endif
 
 #endif
+
+/*****************************************************************************/
+
+#ifdef __cplusplus
+#if defined(__clang__) && !defined(__INTEL_LLVM_COMPILER)
+#define DNG_RESTRICT __restrict
+#elif defined(qWinOS) && !defined(__INTEL_LLVM_COMPILER)
+#define DNG_RESTRICT __restrict
+#else
+#define DNG_RESTRICT
+#endif
+#endif	/* __cplusplus */
+
+/*****************************************************************************/
+
+#ifdef __cplusplus
+#if defined(__clang__) && !defined(__INTEL_LLVM_COMPILER)
+#define DNG_ALWAYS_INLINE __attribute((__always_inline__)) inline
+#else
+#define DNG_ALWAYS_INLINE inline
+#endif
+#endif	/* __cplusplus */
 
 /*****************************************************************************/
 
@@ -320,14 +401,99 @@
 #define qDNGAVXSupport ((qMacOS || qWinOS) && qDNG64Bit && !qARM && 1)
 #endif
 
+#if qDNGAVXSupport && !(qDNG64Bit && !qARM)
+#error AVX support is enabled when 64-bit support is not or ARM is
+#endif
+
+/*****************************************************************************/
+
+#ifndef qDNGSupportVC5
+#define qDNGSupportVC5 (1)
+#endif
+
+/*****************************************************************************/
+
+/// \def qDNGUsingSanitizer
+/// Set to 1 when using a Sanitizer tool.
+
+#ifndef qDNGUsingSanitizer
+#define qDNGUsingSanitizer (0)
+#endif
+
 /*****************************************************************************/
 
 #ifndef DNG_ATTRIB_NO_SANITIZE
+#if qDNGUsingSanitizer && defined(__clang__)
+#define DNG_ATTRIB_NO_SANITIZE(type) __attribute__((no_sanitize(type)))
+#else
 #define DNG_ATTRIB_NO_SANITIZE(type)
-//#if defined(__clang__)
-//#define DNG_ATTRIB_NO_SANITIZE(type) __attribute__((no_sanitize(type)))
-//#endif
 #endif
+#endif
+
+/*****************************************************************************/
+
+// Big image support?
+//
+// When set to true:
+// - maximum linear image dimensions is 300000 pixels
+// - maximum total number of pixels is 10 gigapixels (10 * 1000 * 1000 * 1000 pixels)
+//
+// When set to false:
+// - maximum linear image dimensions is 65000 pixels
+// - maximum total number of pixels is 512 megapixels (512 * 1024 * 1024 pixels)
+
+#ifndef qDNGBigImage
+#define qDNGBigImage (qDNGExperimental && 1)
+#endif
+
+/*****************************************************************************/
+
+// Enable XMP support in the DNG SDK?
+
+#ifndef qDNGUseXMP
+#define qDNGUseXMP 1
+#endif
+
+/*****************************************************************************/
+
+// Use custom integral types?
+
+#ifndef qDNGUseCustomIntegralTypes
+#define qDNGUseCustomIntegralTypes 0
+#endif
+
+/*****************************************************************************/
+
+// Support ProfileGainTableMap2 tag?
+
+#ifndef qDNGProfileGainTableMap2
+#define qDNGProfileGainTableMap2 (1)
+#endif
+
+/*****************************************************************************/
+
+// Support JPEG XL as an image codec for DNG images?
+
+// When this flag is enabled, it enables the dng_jxl module as well as the DNG
+// read & write code that uses JPEG XL as the codec.
+
+#ifndef qDNGSupportJXL
+#define qDNGSupportJXL (1)
+#endif
+
+/*****************************************************************************/
+
+// Support ColumnInterleaveFactor tag? Introduced in DNG 1.7.
+
+#ifndef qDNGSupportColumnInterleaveFactor
+#define qDNGSupportColumnInterleaveFactor (1)
+#endif
+
+/*****************************************************************************/
+
+// Place deprecated flags into this file.
+
+#include "dng_deprecated_flags.h"
 
 /*****************************************************************************/
 

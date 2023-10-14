@@ -1,21 +1,13 @@
 /*****************************************************************************/
-// Copyright 2006-2008 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
-/*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_simple_image.cpp#3 $ */ 
-/* $DateTime: 2016/01/19 15:23:55 $ */
-/* $Change: 1059947 $ */
-/* $Author: erichan $ */
-
 /*****************************************************************************/
 
 #include "dng_simple_image.h"
 
-#include "dng_memory.h"
 #include "dng_orientation.h"
 #include "dng_tag_types.h"
 #include "dng_tag_values.h"
@@ -31,8 +23,8 @@ dng_simple_image::dng_simple_image (const dng_rect &bounds,
 				   planes,
 				   pixelType)
 				   
-	,	fMemory	   ()
 	,	fBuffer	   ()
+	,	fMemory	   ()
 	,	fAllocator (allocator)
 				   
 	{
@@ -52,7 +44,24 @@ dng_simple_image::dng_simple_image (const dng_rect &bounds,
 								fMemory->Buffer ());
 	
 	}
+		
+/*****************************************************************************/
 
+dng_simple_image::dng_simple_image (dng_pixel_buffer &buffer,
+									dng_memory_allocator &allocator)
+									
+	:	dng_image (buffer.fArea,
+				   buffer.fPlanes,
+				   buffer.fPixelType)
+				   
+	,	fBuffer	   (buffer)
+	,	fMemory	   ()
+	,	fAllocator (allocator)
+	
+	{
+	
+	}
+		
 /*****************************************************************************/
 
 dng_simple_image::~dng_simple_image ()
@@ -163,7 +172,18 @@ void dng_simple_image::Rotate (const dng_orientation &orientation)
 	fBuffer.fArea = fBounds;
 								
 	}
-		
+				
+/*****************************************************************************/
+
+void dng_simple_image::Offset (const dng_point &offset)
+	{
+	
+	fBounds = fBounds + offset;
+	
+	fBuffer.fArea = fBounds;
+	
+	}
+
 /*****************************************************************************/
 
 void dng_simple_image::AcquireTileBuffer (dng_tile_buffer &buffer,

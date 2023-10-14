@@ -1,16 +1,9 @@
 /*****************************************************************************/
-// Copyright 2006-2012 Adobe Systems Incorporated
+// Copyright 2006-2023 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
-/*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_host.cpp#2 $ */ 
-/* $DateTime: 2015/06/09 23:32:35 $ */
-/* $Change: 1026104 $ */
-/* $Author: aksherry $ */
-
 /*****************************************************************************/
 
 #include "dng_host.h"
@@ -21,7 +14,9 @@
 #include "dng_exceptions.h"
 #include "dng_exif.h"
 #include "dng_gain_map.h"
+#include "dng_globals.h"
 #include "dng_ifd.h"
+#include "dng_jxl.h"
 #include "dng_lens_correction.h"
 #include "dng_memory.h"
 #include "dng_misc_opcodes.h"
@@ -29,7 +24,10 @@
 #include "dng_resample.h"
 #include "dng_shared.h"
 #include "dng_simple_image.h"
+
+#if qDNGUseXMP
 #include "dng_xmp.h"
+#endif
 
 /*****************************************************************************/
 
@@ -39,16 +37,20 @@ dng_host::dng_host (dng_memory_allocator *allocator,
 	:	fAllocator	(allocator)
 	,	fSniffer	(sniffer)
 	
-	,	fNeedsMeta  		(true)
-	,	fNeedsImage 		(true)
-	,	fForPreview 		(false)
-	,	fMinimumSize 		(0)
-	,	fPreferredSize      (0)
-	,	fMaximumSize    	(0)
+	,	fNeedsMeta			(true)
+	,	fNeedsImage			(true)
+	,	fForPreview			(false)
+	,	fMinimumSize		(0)
+	,	fPreferredSize		(0)
+	,	fMaximumSize		(0)
 	,	fCropFactor			(1.0)
 	,	fSaveDNGVersion		(dngVersion_None)
 	,	fSaveLinearDNG		(false)
 	,	fKeepOriginalFile	(false)
+	,	fIgnoreEnhanced		(false)
+	,	fForFastSaveToDNG	(false)
+	,	fFastSaveToDNGSize	(0)
+	,	fPreserveStage2		(false)
 	
 	{
 	
@@ -109,7 +111,7 @@ void dng_host::ValidateSizes ()
 	
 	if (MaximumSize ())
 		{
-		SetMinimumSize   (Min_uint32 (MinimumSize   (), MaximumSize ()));
+		SetMinimumSize	 (Min_uint32 (MinimumSize	(), MaximumSize ()));
 		SetPreferredSize (Min_uint32 (PreferredSize (), MaximumSize ()));
 		}
 		
@@ -150,7 +152,7 @@ void dng_host::ValidateSizes ()
 			}
 			
 		// Many sensors are near a multiple of 1024 pixels in size, but after
-		// the default crop, they are a just under.  We can get an extra factor
+		// the default crop, they are a just under.	 We can get an extra factor
 		// of size reduction if we allow a slight undershoot in the final size
 		// when computing large previews.
 		
@@ -172,6 +174,56 @@ void dng_host::ValidateSizes ()
 		else if (PreferredSize () >= 1960 && PreferredSize () <= 2048)
 			{
 			SetMinimumSize (1960);
+			}
+
+		else if (PreferredSize () >= 2400 && PreferredSize () <= 2560)
+			{
+			SetMinimumSize (2400);
+			}
+
+		// The following resolutions are typically on HiDPI displays where a
+		// greater degree of upsampling remains visually ok for previews. The
+		// following ratios are all based on 20% upsampling in a linear
+		// dimension.
+
+		else if (PreferredSize () >= 2448 && PreferredSize () <= 2880)
+			{
+			SetMinimumSize (2448);
+			}
+
+		// 1st-generation Surface Book.
+
+		else if (PreferredSize () >= 2560 && PreferredSize () <= 3000)
+			{
+			SetMinimumSize (2560);
+			}
+
+		// 4K (actually 3840).
+
+		else if (PreferredSize () >= 3480 && PreferredSize () <= 4096)
+			{
+			SetMinimumSize (3480);
+			}
+
+		// Surface Studio.
+
+		else if (PreferredSize () >= 3824 && PreferredSize () <= 4500)
+			{
+			SetMinimumSize (3824);
+			}
+
+		// 5K.
+
+		else if (PreferredSize () >= 4352 && PreferredSize () <= 5120)
+			{
+			SetMinimumSize (4352);
+			}
+
+		// 8K.
+
+		else if (PreferredSize () >= 6528 && PreferredSize () <= 7680)
+			{
+			SetMinimumSize (6528);
 			}
 
 		// Else minimum size is same as preferred size.
@@ -230,14 +282,14 @@ bool dng_host::IsTransientError (dng_error_code code)
 
 void dng_host::PerformAreaTask (dng_area_task &task,
 								const dng_rect &area,
-                                dng_area_task_progress *progress)
+								dng_area_task_progress *progress)
 	{
 	
 	dng_area_task::Perform (task,
 							area,
 							&Allocator (),
 							Sniffer (),
-                            progress);
+							progress);
 	
 	}
 		
@@ -270,6 +322,10 @@ dng_exif * dng_host::Make_dng_exif ()
 
 /*****************************************************************************/
 
+#if qDNGUseXMP
+
+/*****************************************************************************/
+
 dng_xmp * dng_host::Make_dng_xmp ()
 	{
 	
@@ -285,6 +341,10 @@ dng_xmp * dng_host::Make_dng_xmp ()
 	return result;
 	
 	}
+
+/*****************************************************************************/
+
+#endif	// qDNGUseXMP
 
 /*****************************************************************************/
 
@@ -373,7 +433,16 @@ dng_opcode * dng_host::Make_dng_opcode (uint32 opcodeID,
 			break;
 			
 			}
+
+		case dngOpcode_WarpRectilinear2:
+			{
 			
+			result = new dng_opcode_WarpRectilinear2 (stream);
+			
+			break;
+			
+			}
+
 		case dngOpcode_WarpFisheye:
 			{
 			
@@ -452,7 +521,7 @@ dng_opcode * dng_host::Make_dng_opcode (uint32 opcodeID,
 			{
 			
 			result = new dng_opcode_DeltaPerRow (*this,
-											     stream);
+												 stream);
 			
 			break;
 			
@@ -462,7 +531,7 @@ dng_opcode * dng_host::Make_dng_opcode (uint32 opcodeID,
 			{
 			
 			result = new dng_opcode_DeltaPerColumn (*this,
-											        stream);
+													stream);
 			
 			break;
 			
@@ -472,7 +541,7 @@ dng_opcode * dng_host::Make_dng_opcode (uint32 opcodeID,
 			{
 			
 			result = new dng_opcode_ScalePerRow (*this,
-											     stream);
+												 stream);
 			
 			break;
 			
@@ -482,7 +551,7 @@ dng_opcode * dng_host::Make_dng_opcode (uint32 opcodeID,
 			{
 			
 			result = new dng_opcode_ScalePerColumn (*this,
-											        stream);
+													stream);
 			
 			break;
 			
@@ -507,6 +576,17 @@ dng_opcode * dng_host::Make_dng_opcode (uint32 opcodeID,
 		}
 	
 	return result;
+	
+	}
+
+/*****************************************************************************/
+
+dng_rgb_to_rgb_table_data *
+dng_host::Make_dng_rgb_to_rgb_table_data (const dng_rgb_table &table)
+	{
+	
+	return new dng_rgb_to_rgb_table_data (*this,
+										  table);
 	
 	}
 		
@@ -537,5 +617,156 @@ void dng_host::ResampleImage (const dng_image &srcImage,
 					 dng_resample_bicubic::Get ());
 	
 	}
+
+/*****************************************************************************/
+
+#if qDNGSupportJXL
+
+/*****************************************************************************/
+
+void dng_host::SetJXLEncodeSettings (const dng_jxl_encode_settings &settings)
+	{
+	
+	fJXLEncodeSettings.reset (new dng_jxl_encode_settings (settings));
+	
+	}
+
+/*****************************************************************************/
+
+dng_jxl_encode_settings *
+dng_host::MakeJXLEncodeSettings (const dng_negative &negative,
+								 const dng_image &image,
+								 const uint32 subFileType,
+								 const bool isProxy) const
+	{
+	
+	AutoPtr<dng_jxl_encode_settings> settings (new dng_jxl_encode_settings);
+
+	const bool isFloat = (image.PixelType () == ttFloat);
+
+	if (isProxy)
+		{
+	
+		settings->SetEffort (7);
+
+		if (subFileType == sfGainMap)
+			{
+			
+			settings->SetDistance (isFloat ? 3.0f : 1.0f);
+			
+			}
+
+		else if (isFloat)
+			{
+
+			settings->SetDistance (3.0f);
+
+			}
+
+		else
+			{
+
+			// Need a higher quality for raw proxies than non-raw proxies,
+			// since users often perform much greater color changes. Also, if
+			// we are targeting a "large" size proxy (larger than 5 MP), or
+			// this is a full size proxy, then use a higher quality.
+
+			bool useHigherQuality =
+				((uint64) image.Width  () *
+				 (uint64) image.Height () > 5000000 ||
+				 image.Bounds ().Size () == negative.OriginalDefaultFinalSize ());
+
+			settings->SetDistance (useHigherQuality ? 0.5f : 1.0f);
+
+			}
+
+		}
+
+	else
+		{
+
+		// Not proxy.
+		
+		if (subFileType == sfTransparencyMask)
+			{
+
+			// Fast lossless.
+
+			settings->SetDistance (0.0f);
+			settings->SetEffort (1);
+
+			}
+
+		else if (subFileType == sfDepthMap ||
+				 subFileType == sfSemanticMask)
+			{
+			
+			// Smaller lossless.
+
+			settings->SetDistance (0.0f);
+			settings->SetEffort (3);
+
+			}
+
+		else if (subFileType == sfMainImage ||
+				 subFileType == sfEnhancedImage)
+			{
+			
+			// High-quality lossy.
+
+			// Note that Enhanced images currently are computed and stored in
+			// linear space (do not take advantage of gamma encodings such as
+			// MapPolynomial) and therefore we need to be conservative with
+			// lossy compression settings. See CR-4203530.
+
+			settings->SetDistance (0.01f);
+			settings->SetEffort (7);
+
+			}
+
+		else if (subFileType == sfGainMap)
+			{
+			
+			settings->SetDistance (1.0f);
+			settings->SetEffort (7);
+
+			}
+
+		else if (subFileType == sfPreviewMask ||
+				 subFileType == sfPreviewImage ||
+				 subFileType == sfPreviewDepthMap ||
+				 subFileType == sfPreviewSemanticMask ||
+				 subFileType == sfAltPreviewImage)
+			{
+			
+			// Smaller lossy.
+
+			settings->SetDistance (2.0f);
+			settings->SetEffort (7);
+
+			}
+
+		#if qDNGValidate
+		
+		if (gVerbose)
+			{
+			
+			printf ("Using JXL distance=%.2f, effort=%u for IFD type %u\n",
+					float (settings->Distance ()),
+					unsigned (settings->Effort ()),
+					unsigned (subFileType));
+			}
+		
+		#endif	// qDNGValidate
+		
+		}
+
+	return settings.Release ();
+	
+	}
+
+/*****************************************************************************/
+
+#endif	// qDNGSupportJXL
 
 /*****************************************************************************/

@@ -1,16 +1,9 @@
 /*****************************************************************************/
-// Copyright 2006 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
-/*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_tag_types.cpp#2 $ */ 
-/* $DateTime: 2015/06/09 23:32:35 $ */
-/* $Change: 1026104 $ */
-/* $Author: aksherry $ */
-
 /*****************************************************************************/
 
 #include "dng_tag_types.h"
@@ -34,6 +27,7 @@ uint32 TagTypeSize (uint32 tagType)
 		case ttShort:
 		case ttSShort:
 		case ttUnicode:
+		case ttHalfFloat:
 			{
 			return 2;
 			}
@@ -50,6 +44,9 @@ uint32 TagTypeSize (uint32 tagType)
 		case ttDouble:
 		case ttSRational:
 		case ttComplex:
+		case ttLong8:
+		case ttSLong8:
+		case ttIFD8:
 			{
 			return 8;
 			}

@@ -1,16 +1,9 @@
 /*****************************************************************************/
-// Copyright 2006 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
-/*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_ref_counted_block.cpp#2 $ */ 
-/* $DateTime: 2015/06/09 23:32:35 $ */
-/* $Change: 1026104 $ */
-/* $Author: aksherry $ */
-
 /*****************************************************************************/
 
 #include <new>
@@ -89,11 +82,11 @@ void dng_ref_counted_block::Clear ()
 
 			{
 		
-			dng_lock_mutex lock (&blockHeader->fMutex);
+			dng_lock_std_mutex lock (blockHeader->fMutex);
 
 			if (--blockHeader->fRefCount == 0)
 				doFree = true;
-                
+				
 			}
 
 		if (doFree)
@@ -115,22 +108,22 @@ void dng_ref_counted_block::Clear ()
 
 dng_ref_counted_block::dng_ref_counted_block (const dng_ref_counted_block &data)
 
-	:   fBuffer (NULL)
+	:	fBuffer (NULL)
 
 	{
 
 	header *blockHeader = (struct header *) data.fBuffer;
-    
-    if (blockHeader)
-        {
+	
+	if (blockHeader)
+		{
 
-        dng_lock_mutex lock (&blockHeader->fMutex);
+		dng_lock_std_mutex lock (blockHeader->fMutex);
 
-        blockHeader->fRefCount++;
+		blockHeader->fRefCount++;
 
-        fBuffer = blockHeader;
-        
-        }
+		fBuffer = blockHeader;
+		
+		}
 
 	}
 		
@@ -141,21 +134,21 @@ dng_ref_counted_block & dng_ref_counted_block::operator= (const dng_ref_counted_
 
 	if (this != &data)
 		{
-        
+		
 		Clear ();
 
 		header *blockHeader = (struct header *) data.fBuffer;
-        
-        if (blockHeader)
-            {
+		
+		if (blockHeader)
+			{
 
-            dng_lock_mutex lock (&blockHeader->fMutex);
+			dng_lock_std_mutex lock (blockHeader->fMutex);
 
-            blockHeader->fRefCount++;
+			blockHeader->fRefCount++;
 
-            fBuffer = blockHeader;
-            
-            }
+			fBuffer = blockHeader;
+			
+			}
 
 		}
 
@@ -175,7 +168,7 @@ void dng_ref_counted_block::EnsureWriteable ()
 
 			{
 			
-			dng_lock_mutex lock (&possiblySharedHeader->fMutex);
+			dng_lock_std_mutex lock (possiblySharedHeader->fMutex);
 
 			if (possiblySharedHeader->fRefCount > 1)
 				{
@@ -195,7 +188,7 @@ void dng_ref_counted_block::EnsureWriteable ()
 			}
 
 		}
-        
+		
 	}
 
 /*****************************************************************************/

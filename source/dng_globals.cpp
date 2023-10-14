@@ -1,25 +1,17 @@
 /*****************************************************************************/
-// Copyright 2006-2012 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
 /*****************************************************************************/
 
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_globals.cpp#2 $ */ 
-/* $DateTime: 2015/06/09 23:32:35 $ */
-/* $Change: 1026104 $ */
-/* $Author: aksherry $ */
-
-/*****************************************************************************/
-
 #include "dng_globals.h"
+#include "dng_simd_type.h"
 
 /*****************************************************************************/
 
-bool gVerbose = false;
-uint32 gDumpLineLimit = 100;
-#if qDNGValidate
+#if qDNGValidate || qDNGDebug
 
 bool gVerbose = false;
 
@@ -33,7 +25,13 @@ bool gDNGUseFakeTimeZonesInXMP = false;
 
 /*****************************************************************************/
 
-bool gDNGShowTimers = true;
+bool gDNGShowTimers =
+#if qDNGValidate
+	true
+#else
+	false
+#endif
+	;
 
 /*****************************************************************************/
 
@@ -49,6 +47,12 @@ bool gPrintTimings = false;
 
 bool gPrintAsserts = true;
 
-bool gBreakOnAsserts = true;
+bool gBreakOnAsserts = false;
+
+/*****************************************************************************/
+
+// This is declared in dng_simd_type.h
+
+SIMDType gDNGMaxSIMD = Scalar;
 
 /*****************************************************************************/

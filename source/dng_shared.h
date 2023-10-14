@@ -1,16 +1,9 @@
 /*****************************************************************************/
-// Copyright 2006-2008 Adobe Systems Incorporated
+// Copyright 2006-2023 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
-/*****************************************************************************/
-
-/* $Id: //mondo/camera_raw_main/camera_raw/dng_sdk/source/dng_shared.h#3 $ */ 
-/* $DateTime: 2016/01/19 15:23:55 $ */
-/* $Change: 1059947 $ */
-/* $Author: erichan $ */
-
 /*****************************************************************************/
 
 #ifndef __dng_shared__
@@ -28,7 +21,62 @@
 #include "dng_stream.h"
 #include "dng_sdk_limits.h"
 #include "dng_types.h"
+#include "dng_utils.h"
 #include "dng_xy_coord.h"
+
+#include <vector>
+
+/*****************************************************************************/
+
+class dng_camera_profile_dynamic_range
+	{
+
+	public:
+
+		uint16 fVersion = 1;
+
+		// 0 = Standard Dynamic Range.
+		// 1 = High Dynamic Range.
+
+		uint16 fDynamicRange = 0;
+
+		// Hint for intended maximum output pixel value (linear gamma).
+
+		real32 fHintMaxOutputValue = 0.0f;
+
+	public:
+
+		bool IsValid () const;
+		
+		bool IsSDR () const
+			{
+			return (fDynamicRange == 0);
+			}
+
+		bool IsHDR () const
+			{
+			return !IsSDR ();
+			}
+
+		void PutStream (dng_stream &stream) const;
+
+		#if qDNGValidate
+		void Dump () const;
+		#endif
+
+		bool operator== (const dng_camera_profile_dynamic_range &src) const
+			{
+			return (fVersion			== src.fVersion		 &&
+					fDynamicRange		== src.fDynamicRange &&
+					fHintMaxOutputValue == src.fHintMaxOutputValue);
+			}
+
+		bool operator!= (const dng_camera_profile_dynamic_range &src) const
+			{
+			return !(*this == src);
+			}
+
+	};
 
 /*****************************************************************************/
 
@@ -43,15 +91,23 @@ class dng_camera_profile_info
 		
 		uint32 fCalibrationIlluminant1;
 		uint32 fCalibrationIlluminant2;
+		uint32 fCalibrationIlluminant3;
+
+		dng_illuminant_data fIlluminantData1;
+		dng_illuminant_data fIlluminantData2;
+		dng_illuminant_data fIlluminantData3;
 		
 		dng_matrix fColorMatrix1;
 		dng_matrix fColorMatrix2;
+		dng_matrix fColorMatrix3;
 		
 		dng_matrix fForwardMatrix1;
 		dng_matrix fForwardMatrix2;
+		dng_matrix fForwardMatrix3;
 		
 		dng_matrix fReductionMatrix1;
 		dng_matrix fReductionMatrix2;
+		dng_matrix fReductionMatrix3;
 
 		dng_string fProfileCalibrationSignature;
 
@@ -71,6 +127,9 @@ class dng_camera_profile_info
 		uint64 fHueSatDeltas2Offset;
 		uint32 fHueSatDeltas2Count;
 		
+		uint64 fHueSatDeltas3Offset;
+		uint32 fHueSatDeltas3Count;
+		
 		uint32 fHueSatMapEncoding;
 		
 		uint32 fLookTableHues;
@@ -89,8 +148,18 @@ class dng_camera_profile_info
 		uint64 fToneCurveOffset;
 		uint32 fToneCurveCount;
 		
-		dng_string fUniqueCameraModel;
+		uint32 fToneMethod;
 		
+		dng_string fUniqueCameraModel;
+
+		std::shared_ptr<const dng_gain_table_map> fProfileGainTableMap;
+
+		dng_camera_profile_dynamic_range fProfileDynamicRange;
+		
+		dng_string fProfileGroupName;
+		
+		std::shared_ptr<const dng_masked_rgb_tables> fMaskedRGBTables;
+
 	public:
 	
 		dng_camera_profile_info ();
@@ -143,6 +212,7 @@ class dng_shared
 
 		dng_matrix fCameraCalibration1;
 		dng_matrix fCameraCalibration2;
+		dng_matrix fCameraCalibration3;
 		
 		dng_string fCameraCalibrationSignature;
 
@@ -154,7 +224,6 @@ class dng_shared
 		
 		dng_srational fBaselineExposure;
 		dng_urational fBaselineNoise;
-		dng_urational fNoiseReductionApplied;
 		dng_urational fBaselineSharpness;
 		dng_urational fLinearResponseLimit;
 		dng_urational fShadowScale;
@@ -191,13 +260,23 @@ class dng_shared
 
 		dng_string fAsShotProfileName;
 
-		dng_noise_profile fNoiseProfile;
-
 		dng_point fOriginalDefaultFinalSize;
 		dng_point fOriginalBestQualityFinalSize;
 		
 		dng_urational fOriginalDefaultCropSizeH;
 		dng_urational fOriginalDefaultCropSizeV;
+  
+		uint32		  fDepthFormat;
+		dng_urational fDepthNear;
+		dng_urational fDepthFar;
+		uint32		  fDepthUnits;
+		uint32		  fDepthMeasureType;
+		
+		dng_std_vector<dng_fingerprint> fBigTableDigests;
+		dng_std_vector<uint64>			fBigTableOffsets;
+		dng_std_vector<uint32>			fBigTableByteCounts;
+
+		dng_image_sequence_info fImageSequenceInfo;
 		
 	public:
 	
