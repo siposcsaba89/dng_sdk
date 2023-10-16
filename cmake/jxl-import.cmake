@@ -2,6 +2,10 @@ if (TARGET jxl::jxl)
     return()
 endif()
 
+find_package(hwy CONFIG REQUIRED)
+find_package(unofficial-brotli CONFIG REQUIRED)
+find_package(lcms2 CONFIG REQUIRED)
+
 find_path(JXL_INCLUDE_DIR jxl)
 get_filename_component(JXL_INSTALL_DIR ${JXL_INCLUDE_DIR} DIRECTORY)
 set(JXL_DEBUG_DIR ${JXL_INSTALL_DIR}/debug/lib)
@@ -27,11 +31,16 @@ find_library(JXL_THREADS_DEBUG_LIBRARY jxl_threads
 message(STATUS "JXL_THREADS_DEBUG_LIBRARY: ${JXL_THREADS_DEBUG_LIBRARY}")
 message(STATUS "JXL_THREADS_RELEASE_LIBRARY: ${JXL_THREADS_RELEASE_LIBRARY}")
 
+add_library(jxl::jxl_threads STATIC IMPORTED)
+set_target_properties(jxl::jxl_threads PROPERTIES
+    IMPORTED_LOCATION_DEBUG ${JXL_THREADS_DEBUG_LIBRARY}
+    IMPORTED_LOCATION_RELEASE ${JXL_THREADS_RELEASE_LIBRARY}
+    INTERFACE_INCLUDE_DIRECTORIES "${JXL_INCLUDE_DIR}"
+)
 add_library(jxl::jxl STATIC IMPORTED)
 set_target_properties(jxl::jxl PROPERTIES
     IMPORTED_LOCATION_DEBUG ${JXL_DEBUG_LIBRARY}
     IMPORTED_LOCATION_RELEASE ${JXL_RELEASE_LIBRARY}
     INTERFACE_INCLUDE_DIRECTORIES "${JXL_INCLUDE_DIR}"
-    IMPORTED_LINK_INTERFACE_LIBRARIES_DEBUG "${JXL_THREADS_DEBUG_LIBRARY}"
-    IMPORTED_LINK_INTERFACE_LIBRARIES_RELEASE "${JXL_THREADS_RELEASE_LIBRARY}"
+    INTERFACE_LINK_LIBRARIES "unofficial::brotli::brotlidec;unofficial::brotli::brotlienc;unofficial::brotli::brotlicommon;hwy::hwy;lcms2::lcms2;jxl::jxl_threads"
 )

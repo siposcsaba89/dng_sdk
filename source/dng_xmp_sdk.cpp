@@ -43,8 +43,6 @@
 
 #define XMP_INCLUDE_XMPFILES qDNGXMPFiles
 
-#define XMP_StaticBuild 1
-
 #if qiPhone
 #undef UNIX_ENV
 #endif

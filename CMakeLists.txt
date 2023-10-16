@@ -171,13 +171,25 @@ set(SRCS
 
 find_package(JPEG REQUIRED)
 find_package(ZLIB REQUIRED)
-find_package(adobe-xmp REQUIRED CONFIG)
+find_package(xmp-toolkit-sdk REQUIRED CONFIG)
 include(cmake/jxl-import.cmake)
 
-add_library(${PROJECT_NAME} ${PUBLIC_HDRS} ${SRCS})
-add_library(::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-target_link_libraries(${PROJECT_NAME} PUBLIC ZLIB::ZLIB ${JPEG_LIBRARIES} ::XMPCoreStatic ::XMPFilesStatic jxl::jxl)
-target_include_directories(${PROJECT_NAME} PRIVATE ${JPEG_INCLUDE_DIR})
+add_library(${PROJECT_NAME} STATIC ${PUBLIC_HDRS} ${SRCS})
+add_library(adobe::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    ZLIB::ZLIB
+    JPEG::JPEG
+    XMP::XMPCore
+    XMP::XMPFiles
+    jxl::jxl
+)
+target_include_directories(${PROJECT_NAME} 
+    PUBLIC 
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sources>
+        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/gen/${PROJECT_NAME}>
+        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
 if (BUILD_SHARED_LIBS)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_VISIBILITY_PRESET hidden
@@ -191,7 +203,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
 )
-target_compile_definitions(${PROJECT_NAME} PUBLIC -DqDNGSupportJXL=1 -DqDNGUseLibJPEG=1 -DqDNGXMPDocOps=0)
+target_compile_definitions(${PROJECT_NAME} PUBLIC qDNGSupportJXL=1 qDNGUseLibJPEG=1 qDNGXMPDocOps=0 qDNGValidate=1 qDNGUseXMP=1)
 if (MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE "/MP")
     target_compile_definitions(${PROJECT_NAME} PUBLIC -DqWinOS=1 -DqWinUniversal=1)
@@ -211,38 +223,34 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRCS})
 include(GenerateExportHeader)
 generate_export_header(${PROJECT_NAME} EXPORT_FILE_NAME ${CMAKE_BINARY_DIR}/gen/${PROJECT_NAME}/${PROJECT_NAME}_export.h)
 
-
-target_include_directories(${PROJECT_NAME} 
-    PUBLIC 
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sources>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../xmp/toolkit/public/include>
-        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/gen/${PROJECT_NAME}>
-        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
-)
-
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/gen/${PROJECT_NAME}-config-version.cmake"
-  VERSION 0.0.1
-  COMPATIBILITY AnyNewerVersion
+    "${CMAKE_CURRENT_BINARY_DIR}/gen/${PROJECT_NAME}-config-version.cmake"
+    VERSION 0.0.1
+    COMPATIBILITY AnyNewerVersion
 )
-
+    
 configure_file(cmake/${PROJECT_NAME}-config.cmake.in ${PROJECT_NAME}-config.cmake @ONLY)
+
+include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}-targets DESTINATION 
-    ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 install(FILES 
         ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake 
         ${CMAKE_CURRENT_BINARY_DIR}/gen/${PROJECT_NAME}-config-version.cmake
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/jxl-import.cmake
     DESTINATION 
-        lib/cmake/${PROJECT_NAME})
+        ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME})
     
-install(EXPORT ${PROJECT_NAME}-targets NAMESPACE :: DESTINATION lib/cmake/${PROJECT_NAME})
+install(EXPORT ${PROJECT_NAME}-targets NAMESPACE adobe:: DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME})
 
 install(FILES
     ${CMAKE_BINARY_DIR}/gen/${PROJECT_NAME}/${PROJECT_NAME}_export.h
 	${PUBLIC_HDRS}
-    DESTINATION include/${PROJECT_NAME})
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
 
 
 option(BUILD_EXAMPLES "Build ${PROJECT_NAME} examples!" OFF)
@@ -250,8 +258,8 @@ if (BUILD_EXAMPLES)
     add_executable(dng_validate source/dng_validate.cpp)
 	set_target_properties(dng_validate PROPERTIES DEBUG_POSTFIX _d)
     set_target_properties(dng_validate PROPERTIES FOLDER examples)
-    target_link_libraries(dng_validate PRIVATE ::dng_sdk)
-    target_compile_options(dng_validate PRIVATE -DqDNGValidateTarget=1)
+    target_link_libraries(dng_validate PRIVATE adobe::dng_sdk)
+    target_compile_definitions(dng_validate PRIVATE -DqDNGValidateTarget=1 qDNGUseXMP=1)
     install(TARGETS dng_validate DESTINATION bin)
 endif()
     
